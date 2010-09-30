@@ -12,11 +12,11 @@ Usage
    (r'^documents/', include('documents.urls')),
 3. If you want to attach documents to your class, in your models definition add:
    
-  class Horse(AnimalModel):
-    model fields here...
-    ...
+    class Horse(AnimalModel):
+      model fields here...
+      ...
 
-    documents = AttachedDocumentManager()
+      documents = AttachedDocumentManager()
 
 Then you can access documents like so:
 
