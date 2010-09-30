@@ -22,11 +22,11 @@ Then you can access documents like so:
 
     >>> the_book=Document.objects.get(title="Black Beauty, the Book")
     >>> black_beauty = Horse.objects.create(name="Black Beauty")
-    >>> apple.documents.add(the_book)
-    >>> apple.tags.all()
+    >>> black_beauty.documents.add(the_book)
+    >>> black_beauty.tags.all()
     [<Document: black-beauty-the-book>]
-    >>> apple.documents.remove(the_book)
-    >>> apple.documents.all()
+    >>> black_beauty.documents.remove(the_book)
+    >>> black_beauty.documents.all()
     []
     >>> Horse.objects.filter(documents__slug__in=["black-beauty-the-book"])
     [<Horse: black-beauty>]
