@@ -60,3 +60,90 @@ class Document(DocumentBase):
         verbose_name = _("Document")
         verbose_name_plural = _("Documents")
 
+    @models.permalink
+    def get_absolute_url(self):
+        return ('document_detail', (), {'year': self.published_on.year, 'slug': self.slug})
+
+class ItemBase(models.Model):
+	def __unicode__(self):
+		return ugettext("%(object)s with %(document) attached") % {
+			"object": self.content_object,
+			"document": self.document
+		}
+
+	class Meta:
+		abstract = True
+
+	@classmethod
+	def document_model(cls):
+		return cls._meta.get_field_by_name("document")[0].rel.to
+
+	@classmethod
+	def document_relname(cls):
+		return cls._meta.get_field_by_name('document')[0].rel.related_name
+
+	@classmethod
+	def lookup_kwargs(cls, instance):
+		return {
+			'content_object': instance
+		}
+
+class DocumentAttachedItemBase(ItemBase):
+	if django.VERSION < (1, 2):
+		document = models.ForeignKey(Document, related_name="%(class)s_with_documents")
+	else:
+		document = models.ForeignKey(Document, related_name="%(app_label)s_%(class)s_with_documents")
+
+	class Meta:
+		abstract = True
+
+	@classmethod
+	def documents_for(cls, model, instance=None):
+		if instance is not None:
+			return cls.document_model().objects.filter(**{
+				'%s__content_object' % cls.tag_relname(): instance
+			})
+		return cls.document_model().objects.filter(**{
+			'%s__content_object__isnull' % cls.document.relname(): False
+		}).distinct()
+
+class GenericDocumentAttachedItemBase(ItemBase):
+	object_id = models.IntegerField(verbose_name=_('Object ID'), db_index=True)
+	if django.VERSION < (1, 2):
+		content_type = models.ForeignKey(
+				ContentType,
+				verbose_name=_('Content type'),
+				related_name="%(class)s_attached_items"
+		)
+	else:
+		content_type = models.ForeignKey(
+				ContentType,
+				verbose_name=_('Content type'),
+				related_name="%(app_label)s_%(class)s_with_documents"
+		)
+	content_object = GenericForeignKey()
+
+	class Meta:
+		abstract = True
+	
+	@classmethod
+	def lookup_kwargs(cls, instance):
+		return {
+			'object_id': instance.pk,
+			'content_type': ContentType.objects.get_for_model(instance)
+		}
+
+	@classmethod
+	def documents_for(cls, model, instance=None):
+		ct = ContentType.objects.get_for_model(model)
+		kwargs = {
+				"%s__content_type" % cls.document_relname(): ct
+		}
+		if instance is not None:
+			kwargs["%s__object_id" % cls.document_relname()] = instance.pk
+		return cls.document_model().objects.filter(**kwargs).distinct()
+
+class ItemWithDocuments(GenericDocumentAttachedItemBase, DocumentAttachedItemBase):
+	class Meta:
+		verbose_name = _("Item with Documents")
+		verbose_name_plural = _("Items with Documents")
