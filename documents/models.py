@@ -1,4 +1,4 @@
-import django
+from django.db import models
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.generic import GenericForeignKey
 from django.db import models, IntegrityError, transaction
@@ -7,61 +7,98 @@ from django.utils.translation import ugettext_lazy as _, ugettext
 
 from directory.models import Place
 from taggit.managers import TaggableManager
+from django_extensions.db.models import TimeStampedModel
+from documents.managers import PublishedManager
 
-class DocumentBase(models.Model):
+class Document(TimeStampedModel):
+    ACCESS_CHOICES = (('public', 'Public'),
+                     ('private', 'Private'),
+                     ('organization', 'Organization'))
     title = models.CharField(verbose_name=_('Title'), max_length=255)
     slug = models.SlugField(verbose_name=_('Slug'), unique=True, max_length=200)
-    summary=models.TextField(_('summary') )
-    file=models.FileField(_('file'), upload_to="/documents/%Y/%b/%d")
-    content=models.TextField(_('content'), blank=True, null=True, help_text="If document is plaintext, insert it here.")
-    source=models.ForeignKey(Place, blank=True, null=True, help_text="Source of document.")
+    description=models.TextField(_('Description'), blank=True, null=True )
+    source=models.CharField(_('Source'), max_length=100)
+    access=models.CharField(_('Access'), max_length=12, choices=ACCESS_CHOICES, default='public')
     published=models.BooleanField(_('published'), default=False)
     published_on=models.DateTimeField(_('published on'))
     preview=models.ImageField(_('preview'), upload_to="documents/previews", blank=True, null=True)
+    doc_cloud_id=models.SlugField(max_length=80, editable=False, null=True, blank=True)
 
     tags = TaggableManager()
-
-
+    objects=models.Manager()
+    published_objects=PublishedManager()
 
     def __unicode__(self):
         return self.title
 
     class Meta:
-        abstract = True
-
-    def save(self, *args, **kwargs):
-        if not self.pk and not self.slug:
-            self.slug = slug = slugify(self.name)
-            if django.VERSION >= (1, 2):
-                from django.db import router
-                using = kwargs.get("using") or router.db_for_write(
-                    type(self), instance=self)
-                # Make sure we write to the same db for all attempted writes,
-                # with a multi-master setup, theoretically we could try to
-                # write and rollback on different DBs
-                kwargs["using"] = using
-                trans_kwargs = {"using": using}
-            else:
-                trans_kwargs = {}
-            i = 0
-            while True:
-                try:
-                    sid = transaction.savepoint(**trans_kwargs)
-                    res = super(TagBase, self).save(*args, **kwargs)
-                    transaction.savepoint_commit(sid, **trans_kwargs)
-                    return res
-                except IntegrityError:
-                    transaction.savepoint_rollback(sid, **trans_kwargs)
-                    i += 1
-                    self.slug = "%s_%d" % (slug, i)
-        else:
-            return super(DocumentBase, self).save(*args, **kwargs)
-
-class Document(DocumentBase):
-    class Meta:
         verbose_name = _("Document")
         verbose_name_plural = _("Documents")
 
-    @models.permalink
+    @models.permalink 
     def get_absolute_url(self):
-        return ('doc-document_detail', (), {'year': self.published_on.year, 'slug': self.slug})
+        return ('dc-document-detail', (), {
+                'year': self.published_on.year,
+                'month': self.published_on.strftime('%b').lower(),
+                'day': self.published_on.day,
+                'slug': self.slug})
+
+class TextDocument(Document):
+    content=models.TextField(_('content'), blank=True, null=True, help_text="If document is plaintext, insert it here.")
+
+    class Meta:
+        verbose_name = _("Text Document")
+        verbose_name_plural = _("Text Documents")
+
+    @models.permalink 
+    def get_absolute_url(self):
+        return ('dc-text-document-detail', (), {
+                'year': self.published_on.year,
+                'month': self.published_on.strftime('%b').lower(),
+                'day': self.published_on.day,
+                'slug': self.slug})
+
+class PDFDocument(Document):
+    file=models.FileField(_('file'), upload_to="documents/pdf/%Y/%b/%d")
+
+    class Meta:
+        verbose_name = _("PDF Document")
+        verbose_name_plural = _("PDF Documents")
+
+    @models.permalink 
+    def get_absolute_url(self):
+        return ('dc-pdf-document-detail', (), {
+                'year': self.published_on.year,
+                'month': self.published_on.strftime('%b').lower(),
+                'day': self.published_on.day,
+                'slug': self.slug})
+
+class ExcelDocument(Document):
+    file=models.FileField(_('file'), upload_to="documents/excel/%Y/%b/%d")
+
+    class Meta:
+        verbose_name = _("Excel Document")
+        verbose_name_plural = _("Excel Documents")
+
+    @models.permalink 
+    def get_absolute_url(self):
+        return ('dc-xcl-document-detail', (), {
+                'year': self.published_on.year,
+                'month': self.published_on.strftime('%b').lower(),
+                'day': self.published_on.day,
+                'slug': self.slug})
+
+class WordDocument(Document):
+    file=models.FileField(_('file'), upload_to="documents/word/%Y/%b/%d")
+
+    class Meta:
+        verbose_name = _("Word Document")
+        verbose_name_plural = _("Word Documents")
+
+    @models.permalink 
+    def get_absolute_url(self):
+        return ('dc-word-document-detail', (), {
+                'year': self.published_on.year,
+                'month': self.published_on.strftime('%b').lower(),
+                'day': self.published_on.day,
+                'slug': self.slug})
