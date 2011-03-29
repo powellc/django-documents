@@ -43,6 +43,10 @@ class Document(TimeStampedModel):
                 'day': self.published_on.day,
                 'slug': self.slug})
 
+    @property
+    def display(self):
+        return True
+
 class TextDocument(Document):
     content=models.TextField(_('content'), blank=True, null=True, help_text="If document is plaintext, insert it here.")
 
